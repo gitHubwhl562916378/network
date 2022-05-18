@@ -19,6 +19,7 @@ namespace net {
         auto ret = ::connect(GetNativeSocket(), (sockaddr *)&addr, sizeof(addr));
         if (!ret) {
             SetHost(host);
+            m_isConnected = true;
         }
 
         return !ret;
@@ -27,16 +28,23 @@ namespace net {
         Close();
     }
     int32_t TcpSocket::Write(const std::string &data) {
+        if (!m_isConnected) {
+            return -1;
+        }
         return Write(GetNativeSocket(), data.data(), data.size());
     }
     int32_t TcpSocket::Read(std::string &data) {
-        char buffer[8092]{0};
-        auto bytes = Read(GetNativeSocket(), buffer, sizeof(buffer) / sizeof(char));
+        if (!m_isConnected) {
+            return -1;
+        }
+
+        auto bytes = Read(GetNativeSocket(), data.data(), data.size());
         if (0 >= bytes) {
             return bytes;
         }
+        data.resize(bytes);
+        data.shrink_to_fit();
 
-        data = std::string(buffer, buffer + bytes);
         return bytes;
     }
     int32_t TcpSocket::Write(const int32_t fd, const char *buffer, const uint32_t bufferLen) {

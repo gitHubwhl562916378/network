@@ -37,7 +37,7 @@ namespace net {
         int32_t Write(const std::string &data);
         /**
          * @brief 同步读取数据
-         * @param data 返回读到的数据
+         * @param data 返回读到的数据, 需要使用std::string(n, 0)或者resize初始化空间大小;不能使用reserve数据写不进去
          * @return int32_t 成功读取到的字节数
          * @retval >0 成功读取的字节数
          * @retval <=0 读取失败，错误码在errno中

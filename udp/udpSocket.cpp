@@ -21,13 +21,13 @@ namespace net {
     }
     int32_t UdpSocket::Read(std::string &data) {
         INetHost remote;
-        char buffer[1024]{0};
-        auto bytes = Read(GetNativeSocket(), buffer, sizeof(buffer) / sizeof(char), remote);
+        auto bytes = Read(GetNativeSocket(), data.data(), data.size(), remote);
         if (0 >= bytes) {
             return bytes;
         }
+        data.resize(bytes);
+        data.shrink_to_fit();
 
-        data = std::string(buffer, buffer + bytes);
         return bytes;
     }
     int32_t UdpSocket::Write(const int32_t fd, const char *buffer, const uint32_t bufferLen, const INetHost &host) {

@@ -61,8 +61,8 @@ namespace net {
     void TcpServer::OnNewConnection(std::shared_ptr<AsyncTcpSocket> client) {
         std::cout << "New connection: " << client->GetINetHost().Ip() << " " << client->GetINetHost().Port() << std::endl;
         client->Read([](std::shared_ptr<AsyncSocket> s, const std::string &data) {
-            std::cout << "Receive client " << s->GetINetHost().Ip() << " " << s->GetINetHost().Port() << " size: " << data.size()
-                      << " data: " << data << std::endl;
+            std::cout << "Receive client " << s->GetINetHost().Ip() << " " << s->GetINetHost().Port() << " size: " << data.size() << " "
+                      << data.capacity() << " data: " << data << std::endl;
             s->Write("packed data");
         });
     }

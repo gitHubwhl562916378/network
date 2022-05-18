@@ -35,16 +35,18 @@ namespace net {
     }
 
     int32_t AsyncUdpSocket::HandleRead() {
-        char buffer[1024]{0};
+        std::string buffer(1500, 0);
         INetHost remote;
-        auto bytes = UdpSocket::Read(GetNativeSocket(), buffer, sizeof(buffer) / sizeof(char), remote);
+        auto bytes = UdpSocket::Read(GetNativeSocket(), buffer.data(), buffer.size(), remote);
         if (0 >= bytes) {
             return bytes;
         }
 
+        buffer.resize(bytes);
+        buffer.shrink_to_fit();
         SetHost(remote);
         if (m_readCb) {
-            m_readCb(shared_from_this(), std::string(buffer, buffer + bytes));
+            m_readCb(shared_from_this(), buffer);
         }
 
         return bytes;
