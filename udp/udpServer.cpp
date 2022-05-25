@@ -10,28 +10,26 @@
 
 namespace geely {
 namespace net {
-    UdpServer::UdpServer(std::shared_ptr<IoLoop> loop, const INetHost &host)
-        : AsyncUdpSocket(loop, host)
-        , m_localHost(host) {
+    UdpServer::UdpServer(std::shared_ptr<IoLoop> loop)
+        : AsyncUdpSocket(loop, INetHost()) {
         int32_t option = 1;
         ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+    }
 
+    UdpServer::~UdpServer() {}
+
+    bool UdpServer::Bind(const INetHost &host) {
         sockaddr_in ser_addr;
         ::memset(&ser_addr, 0, sizeof(ser_addr));
         ser_addr.sin_family = AF_INET;
         ser_addr.sin_port = ::htons(host.Port());
         ser_addr.sin_addr.s_addr = ::inet_addr(host.Ip().data());
-        auto code = ::bind(GetNativeSocket(), (sockaddr *)&ser_addr, sizeof(ser_addr));
-        if (code) {
-            std::ostringstream oss;
-            oss << "bind failed code: " << code << ", " << strerror(errno) << std::endl;
-            throw std::runtime_error(oss.str());
-        }
-
         Read(std::bind(&UdpServer::OnClientMessage, this, std::placeholders::_1, std::placeholders::_2));
-    }
+        SetHost(host);
+        m_localHost = host;
 
-    UdpServer::~UdpServer() {}
+        return !::bind(GetNativeSocket(), (sockaddr *)&ser_addr, sizeof(ser_addr));
+    }
 
     INetHost UdpServer::GetLocalHost() const {
         return m_localHost;

@@ -19,18 +19,24 @@ namespace net {
     class TcpServer : public AsyncSocket {
     public:
         /**
-         * @brief 使用生成fd,绑定端口,host赋值到基类
+         * @brief 使用生成fd
          *
          * @param loop IO事件循环对象
-         * @param host
          */
-        explicit TcpServer(std::shared_ptr<IoLoop> loop, const INetHost &host);
+        explicit TcpServer(std::shared_ptr<IoLoop> loop);
         /**
          * @brief 回收资源, 对m_sessions中已有的连接不做RemoveAsyncSocket，认为析构程序退出。运行期间，由客户端断开在
          * 事件循环中自动RemoveAsyncSocket
          * @retval
          */
         ~TcpServer();
+        /**
+         * @brief 绑定端口
+         * @param host 端口和绑定地址
+         * @return true 成功
+         * @return false 失败
+         */
+        bool Bind(const INetHost &host);
         /**
          * @brief 绑定端口，监听端口，需要使用IoLoop::AddAsyncSocket添加到循环，并IoLoop::Update读事件
          *

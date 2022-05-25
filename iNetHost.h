@@ -18,9 +18,28 @@ namespace net {
     public:
         INetHost();
         INetHost(const std::string &ip, const uint16_t port);
+        /**
+         * @brief Set the Port object
+         * @param port 端口
+         * @retval
+         */
         void SetPort(const uint16_t port);
+        /**
+         * @brief Set the Ip object
+         * @param ip 地址
+         * @retval
+         */
         void SetIp(const std::string &ip);
+        /**
+         * @brief 返回端口
+         * @return uint16_t
+         */
         uint16_t Port() const;
+        /**
+         * @brief 返回地址
+         * @return std::string
+         * @retval
+         */
         std::string Ip() const;
 
     private:

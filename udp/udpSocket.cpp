@@ -21,7 +21,7 @@ namespace net {
     }
     int32_t UdpSocket::Read(std::string &data) {
         INetHost remote;
-        auto bytes = Read(GetNativeSocket(), data.data(), data.size(), remote);
+        auto bytes = Read(GetNativeSocket(), const_cast<char *>(data.data()), data.size(), remote);
         if (0 >= bytes) {
             return bytes;
         }

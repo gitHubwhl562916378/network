@@ -38,7 +38,7 @@ namespace net {
             return -1;
         }
 
-        auto bytes = Read(GetNativeSocket(), data.data(), data.size());
+        auto bytes = Read(GetNativeSocket(), const_cast<char *>(data.data()), data.size());
         if (0 >= bytes) {
             return bytes;
         }

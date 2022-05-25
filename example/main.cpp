@@ -4,8 +4,27 @@
 #include "../tcp/tcpServer.h"
 #include "../tcp/tcpSocket.h"
 #include "../epoll/epollLoop.h"
+#include "../timerSocket.h"
 
-uint64_t g_filesize = 0;
+class TestTcpCommServer : public geely::net::TcpServer
+{
+public:
+    explicit TestTcpCommServer(std::shared_ptr<geely::net::IoLoop> loop)
+        : TcpServer(loop) {}
+
+protected:
+    void OnNewConnection(std::shared_ptr<geely::net::AsyncTcpSocket> session) override
+    {
+        std::cout << "TestTcpCommServer new client arrived " << session->GetINetHost().Ip() << " " << session->GetINetHost().Port() << std::endl;
+        session->Read([](std::shared_ptr<AsyncSocket> s, const std::string &data)
+                      {
+                          std::cout << "TestTcpCommServer received " << data.size() << " bytes, capacity " << data.capacity() << std::endl;
+            s->Write("this is your request data"); });
+    }
+};
+
+uint64_t g_fileSize = 0;
+uint64_t g_totalSize = 0;
 namespace geely
 {
     namespace net
@@ -13,50 +32,52 @@ namespace geely
         class FileServer : public TcpServer
         {
         public:
-            explicit FileServer(std::shared_ptr<IoLoop> loop, const INetHost &host)
-                : TcpServer(loop, host) {}
+            explicit FileServer(std::shared_ptr<IoLoop> loop)
+                : TcpServer(loop) {}
             void OnNewConnection(std::shared_ptr<AsyncTcpSocket> session) override
             {
-                std::cout << "new client arrived " << session->GetINetHost().Ip() << " " << session->GetINetHost().Port() << std::endl;
+                std::cout << "FileServer new client arrived " << session->GetINetHost().Ip() << " " << session->GetINetHost().Port() << std::endl;
                 session->Read([](std::shared_ptr<AsyncSocket> s, const std::string &data)
                               {
-                g_filesize += data.size();
-                if (g_filesize == 1024 * 1024 * 1024) {
-                    std::cout << "receive client " << g_filesize << " bytes" << std::endl;
-                    s->Write(std::to_string(g_filesize) + " bytes");
+                g_fileSize += data.size();
+                if (g_fileSize == g_totalSize) {
+                    std::cout << "FileServer receive client " << g_fileSize << "bytes"<< std::endl;
+                    s->Write(std::to_string(g_fileSize) + " bytes");
                 } });
             }
         };
     } // namespace net
 } // namespace geely
-void TestTcpBigFile(std::shared_ptr<geely::net::IoLoop> loop)
+int64_t TestTcpBigFile(std::shared_ptr<geely::net::IoLoop> loop, const int64_t fileSize)
 {
-    auto server = std::make_shared<geely::net::FileServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<geely::net::FileServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return -1;
+    }
     if (!server->Listen(1024))
     {
-        std::cout << "Listen failed" << std::endl;
-        return;
+        return -1;
     }
     loop->AddAsyncSocket(server);
 
     auto client = std::make_shared<geely::net::AsyncTcpSocket>(loop);
     if (!client->Connect({"127.0.0.1", 6666}))
     {
-        std::cout << "Connect failed" << std::endl;
-    }
-    else
-    {
-        std::cout << "Connect success" << std::endl;
+        return false;
     }
     client->Read([](std::shared_ptr<geely::net::AsyncSocket> s, const std::string &data)
-                 { std::cout << "I Recevied server " << data.size() << " bytes: " << data << " " << data.size() << " " << data.capacity() << std::endl; });
+                 { std::cout << "TestTcpBigFile I Recevied server " << data.size() << " bytes: " << data << ", capacity " << data.capacity() << std::endl; });
     loop->AddAsyncSocket(client);
-    std::string file(1024 * 1024 * 1024, 0); // 1G大小
+    g_totalSize = fileSize;
+    std::string file(g_totalSize, 0); // 1G大小
     client->Write(file);
 
-    sleep(-1);
+    sleep(5);
     loop->RemoveAsyncSocket(client);
     loop->RemoveAsyncSocket(server);
+    auto ret = g_fileSize;
+    return ret;
 }
 
 namespace geely
@@ -66,11 +87,11 @@ namespace geely
         class MyTcpServer : public TcpServer
         {
         public:
-            explicit MyTcpServer(std::shared_ptr<IoLoop> loop, const INetHost &host)
-                : TcpServer(loop, host) {}
+            explicit MyTcpServer(std::shared_ptr<IoLoop> loop)
+                : TcpServer(loop) {}
             void OnNewConnection(std::shared_ptr<AsyncTcpSocket> session) override
             {
-                std::cout << "new client arrived " << session->GetINetHost().Ip() << " " << session->GetINetHost().Port() << std::endl;
+                std::cout << "MyTcpServer new client arrived " << session->GetINetHost().Ip() << " " << session->GetINetHost().Port() << std::endl;
                 session->Read([](std::shared_ptr<AsyncSocket> s, const std::string &data)
                               {
                 std::cout << "MyTcpServer recv task " << data << " " << data.size() << " " << data.capacity() << std::endl;
@@ -79,27 +100,27 @@ namespace geely
         };
     } // namespace net
 } // namespace geely
-void TestCustomTcpServer(std::shared_ptr<geely::net::IoLoop> loop)
+bool TestCustomTcpServer(std::shared_ptr<geely::net::IoLoop> loop)
 {
-    auto server = std::make_shared<geely::net::MyTcpServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<geely::net::MyTcpServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return false;
+    }
     if (!server->Listen(1024))
     {
         std::cout << "Listen failed" << std::endl;
-        return;
+        return false;
     }
     loop->AddAsyncSocket(server);
 
     auto client = std::make_shared<geely::net::AsyncTcpSocket>(loop);
     if (!client->Connect({"127.0.0.1", 6666}))
     {
-        std::cout << "Connect failed" << std::endl;
-    }
-    else
-    {
-        std::cout << "Connect success" << std::endl;
+        return false;
     }
     client->Read([](std::shared_ptr<geely::net::AsyncSocket> s, const std::string &data)
-                 { std::cout << "I Recevied server " << data.size() << " " << data.capacity() << " bytes: " << data << std::endl; });
+                 { std::cout << "TestCustomTcpServer I Recevied server " << data.size() << " bytes, capacity " << data.capacity() << std::endl; });
     loop->AddAsyncSocket(client);
     for (int i = 0; i < 10; i++)
     {
@@ -110,15 +131,19 @@ void TestCustomTcpServer(std::shared_ptr<geely::net::IoLoop> loop)
     sleep(2);
     loop->RemoveAsyncSocket(client);
     loop->RemoveAsyncSocket(server);
+    return true;
 }
 
-void TestTcpServerByMultiAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
+bool TestTcpServerByMultiAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
 {
-    auto server = std::make_shared<geely::net::TcpServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<TestTcpCommServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return false;
+    }
     if (!server->Listen(1024))
     {
-        std::cout << "Listen failed" << std::endl;
-        return;
+        return false;
     }
     loop->AddAsyncSocket(server);
 
@@ -129,14 +154,10 @@ void TestTcpServerByMultiAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
         clients.push_back(client);
         if (!client->Connect({"127.0.0.1", 6666}))
         {
-            std::cout << "Connect failed" << std::endl;
-        }
-        else
-        {
-            std::cout << "Connect success" << std::endl;
+            continue;
         }
         client->Read([](std::shared_ptr<geely::net::AsyncSocket> s, const std::string &data)
-                     { std::cout << "I Recevied server " << data.size() << " " << data.capacity() << " bytes: " << data << std::endl; });
+                     { std::cout << "TestTcpServerByMultiAsyncClient I Recevied server " << data.size() << " bytes,capacity " << data.capacity() << std::endl; });
         loop->AddAsyncSocket(client);
         client->Write("client data " + std::to_string(i));
     }
@@ -147,15 +168,19 @@ void TestTcpServerByMultiAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
         loop->RemoveAsyncSocket(c);
     }
     loop->RemoveAsyncSocket(server);
+    return true;
 }
 
-void TestTcpServerByMultiSyncClient(std::shared_ptr<geely::net::IoLoop> loop)
+bool TestTcpServerByMultiSyncClient(std::shared_ptr<geely::net::IoLoop> loop)
 {
-    auto server = std::make_shared<geely::net::TcpServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<TestTcpCommServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return false;
+    }
     if (!server->Listen(20))
     {
-        std::cout << "Listen failed" << std::endl;
-        return;
+        return false;
     }
     loop->AddAsyncSocket(server);
 
@@ -169,28 +194,46 @@ void TestTcpServerByMultiSyncClient(std::shared_ptr<geely::net::IoLoop> loop)
         auto bytes = client->Write("client data " + std::to_string(i));
         std::string res(1500, 0);
         bytes = client->Read(res);
-        std::cout << "I received server " << bytes << " bytes: " << res << " " << res.size() << " " << res.capacity() << std::endl;
+        std::cout << "TestTcpServerByMultiSyncClient I received server " << bytes << " bytes: " << res << " capacity " << res.capacity() << std::endl;
     }
 
     sleep(5);
     loop->RemoveAsyncSocket(server);
+    return true;
 }
 
-void TestAsyncUdpClientWriteInCallBack(std::shared_ptr<geely::net::IoLoop> loop)
+class TestUdpCommonServer : public geely::net::UdpServer
+{
+public:
+    explicit TestUdpCommonServer(std::shared_ptr<geely::net::IoLoop> loop)
+        : UdpServer(loop) {}
+
+protected:
+    void OnClientMessage(std::shared_ptr<AsyncSocket> session, const std::string &data) override
+    {
+        auto remote = GetINetHost();
+        std::cout << "TestUdpCommonServer receive client message Ip: " << remote.Ip() << " " << remote.Port() << " " << data.size() << " bytes" << std::endl;
+        session->Write("I Recevied " + std::to_string(data.size()) + " bytes");
+    }
+};
+bool TestAsyncUdpClientWriteInCallBack(std::shared_ptr<geely::net::IoLoop> loop)
 {
     //使用期间,保证server的生命周期
-    auto server = std::make_shared<geely::net::UdpServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<TestUdpCommonServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return false;
+    }
     if (!loop->AddAsyncSocket(server))
     {
-        std::cout << "sys error" << std::endl;
-        return;
+        return false;
     }
 
     //使用期间,保证client的生命周期
     auto client = std::make_shared<geely::net::AsyncUdpSocket>(loop, geely::net::INetHost{"127.0.0.1", 6666});
     client->Read([loop](std::shared_ptr<geely::net::AsyncSocket> s, const std::string &data)
                  {
-        std::cout << "Server response: " << data << " " << data.size() << " " << data.capacity() << std::endl;
+        std::cout << "TestAsyncUdpClientWriteInCallBack server response: " << data << " " << data.size() << " " << data.capacity() << std::endl;
         static int num = 0;
         if (200 < num) {
             return;
@@ -198,33 +241,35 @@ void TestAsyncUdpClientWriteInCallBack(std::shared_ptr<geely::net::IoLoop> loop)
         s->Write("Receive times " + std::to_string(++num)); });
     if (!loop->AddAsyncSocket(client))
     {
-        std::cout << "sys error" << std::endl;
-        return;
+        return false;
     }
     client->Write("Start");
 
     //异步读写，等待，确保client读完后再释放。
     sleep(2);
     loop->RemoveAsyncSocket(server);
+    return true;
 }
 
-void TestUdpServerByAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
+bool TestUdpServerByAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
 {
     //使用期间,保证server的生命周期
-    auto server = std::make_shared<geely::net::UdpServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<TestUdpCommonServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return false;
+    }
     if (!loop->AddAsyncSocket(server))
     {
-        std::cout << "sys error" << std::endl;
-        return;
+        return false;
     }
 
     auto client = std::make_shared<geely::net::AsyncUdpSocket>(loop, geely::net::INetHost{"127.0.0.1", 6666});
     client->Read([](std::shared_ptr<geely::net::AsyncSocket> s, const std::string &data)
-                 { std::cout << "Server response: " << data << " " << data.size() << " " << data.capacity() << std::endl; });
+                 { std::cout << "TestUdpServerByAsyncClient server response " << data << " " << data.size() << " " << data.capacity() << std::endl; });
     if (!loop->AddAsyncSocket(client))
     {
-        std::cout << "sys error" << std::endl;
-        return;
+        return false;
     }
     int32_t num = 0;
     while (true)
@@ -241,16 +286,20 @@ void TestUdpServerByAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
     //异步读写，等待，确保client读完后再释放。
     sleep(2);
     loop->RemoveAsyncSocket(server);
+    return true;
 }
 
-void TestUdpServerBySyncClient(std::shared_ptr<geely::net::IoLoop> loop)
+bool TestUdpServerBySyncClient(std::shared_ptr<geely::net::IoLoop> loop)
 {
     //使用期间,保证server的生命周期
-    auto server = std::make_shared<geely::net::UdpServer>(loop, geely::net::INetHost{"0.0.0.0", 6666});
+    auto server = std::make_shared<TestUdpCommonServer>(loop);
+    if (!server->Bind({"0.0.0.0", 6666}))
+    {
+        return false;
+    }
     if (!loop->AddAsyncSocket(server))
     {
-        std::cout << "sys error" << std::endl;
-        return;
+        return false;
     }
 
     int32_t num = 0;
@@ -258,10 +307,10 @@ void TestUdpServerBySyncClient(std::shared_ptr<geely::net::IoLoop> loop)
     {
         std::string data = "packed udp data " + std::to_string(num++);
         geely::net::UdpSocket uclient({"127.0.0.1", 6666});
-        std::cout << "client write " << uclient.Write(data) << " bytes" << std::endl;
+        std::cout << "TestUdpServerBySyncClient client write " << uclient.Write(data) << " bytes" << std::endl;
         std::string recv(1500, 0);
         auto bytes = uclient.Read(recv);
-        std::cout << "Server response: " << recv << " " << recv.size() << " " << recv.capacity() << std::endl;
+        std::cout << "TestUdpServerBySyncClient server response " << recv << " " << recv.size() << " " << recv.capacity() << std::endl;
 
         if (200 < num)
         {
@@ -269,6 +318,24 @@ void TestUdpServerBySyncClient(std::shared_ptr<geely::net::IoLoop> loop)
         }
     }
     loop->RemoveAsyncSocket(server);
+    return true;
+}
+
+bool TestTimerOneTime(std::shared_ptr<geely::net::IoLoop> loop, const uint32_t firstInterval, const uint32_t intervalAfterFirst)
+{
+    auto timer = std::make_shared<geely::TimerSocket>(firstInterval, intervalAfterFirst);
+    timer->OnTimeOut([](const uint64_t t)
+                     { std::cout << "TestTimerOneTime timeout " << t << std::endl; });
+    loop->AddAsyncSocket(timer);
+
+    if (!timer->Start())
+    {
+        return false;
+    }
+
+    ::sleep(10);
+    loop->RemoveAsyncSocket(timer);
+    return true;
 }
 
 int main(int argc, char **argv)
@@ -279,14 +346,15 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    TestAsyncUdpClientWriteInCallBack(loop);
+    // TestAsyncUdpClientWriteInCallBack(loop);
     // TestUdpServerByAsyncClient(loop);
     // TestUdpServerBySyncClient(loop);
 
-    // TestTcpBigFile(loop);
+    // TestTcpBigFile(loop, 1024 * 1024 * 1024);
     // TestTcpServerByMultiAsyncClient(loop);
     // TestTcpServerByMultiSyncClient(loop);
-    // TestCustomTcpServer(loop);
+    TestCustomTcpServer(loop);
+    // TestTimerOneTime(loop, 500, 500);
 
     ::sleep(5);
     return 0;

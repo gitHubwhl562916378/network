@@ -9,7 +9,7 @@
 
 namespace geely {
 namespace net {
-    TcpServer::TcpServer(std::shared_ptr<IoLoop> loop, const INetHost &host)
+    TcpServer::TcpServer(std::shared_ptr<IoLoop> loop)
         : m_loop(loop) {
         auto fd = ::socket(AF_INET, SOCK_STREAM, 0);
         int32_t option = 1;
@@ -22,24 +22,21 @@ namespace net {
         m.l_linger = 2; // time_wait时间,秒计算
         setsockopt(GetNativeSocket(), SOL_SOCKET, SO_LINGER, (const char *)&m, sizeof(m));
         SetNativeSocket(fd);
+    }
 
+    TcpServer::~TcpServer() {
+        Close();
+    }
+
+    bool TcpServer::Bind(const INetHost &host) {
         sockaddr_in ser_addr;
         ::memset(&ser_addr, 0, sizeof(ser_addr));
         ser_addr.sin_family = AF_INET;
         ser_addr.sin_port = ::htons(host.Port());
         ser_addr.sin_addr.s_addr = ::inet_addr(host.Ip().data());
-        auto code = ::bind(GetNativeSocket(), (sockaddr *)&ser_addr, sizeof(ser_addr));
-        if (code) {
-            std::ostringstream oss;
-            oss << "bind failed code: " << code << ", " << strerror(errno) << std::endl;
-            throw std::runtime_error(oss.str());
-        }
-
         SetHost(host);
-    }
 
-    TcpServer::~TcpServer() {
-        Close();
+        return !::bind(GetNativeSocket(), (sockaddr *)&ser_addr, sizeof(ser_addr));
     }
 
     int32_t TcpServer::Listen(int32_t num) {
