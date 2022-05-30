@@ -1,4 +1,3 @@
-#pragma once
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <sys/epoll.h>

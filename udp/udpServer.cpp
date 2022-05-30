@@ -16,7 +16,9 @@ namespace net {
         ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
     }
 
-    UdpServer::~UdpServer() {}
+    UdpServer::~UdpServer() {
+        Close();
+    }
 
     bool UdpServer::Bind(const INetHost &host) {
         sockaddr_in ser_addr;

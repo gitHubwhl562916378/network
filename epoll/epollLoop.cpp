@@ -9,14 +9,14 @@ namespace geely {
 namespace net {
     EpollLoop::EpollLoop() {}
     EpollLoop::~EpollLoop() {
-        ::printf("EpollLoop::~EpollLoop\n");
+        std::cout << "EpollLoop::~EpollLoop In" << std::endl;
         m_shutDown = true;
         m_notifySocket->WakeUp();
         if (m_ioThread.joinable()) {
             m_ioThread.join();
         }
 
-        ::printf("EpollLoop::~EpollLoop\n");
+        std::cout << "EpollLoop::~EpollLoop Out" << std::endl;
     }
 
     bool EpollLoop::AddAsyncSocket(std::shared_ptr<AsyncSocket> s) {
@@ -28,7 +28,7 @@ namespace net {
 
             epoll_event ev;
             ev.events = EPOLLIN | EPOLLET;
-            ev.data.ptr = s.get();
+            ev.data.fd = s->GetNativeSocket();
             auto ret = ::epoll_ctl(m_epollFd, EPOLL_CTL_ADD, s->GetNativeSocket(), &ev);
             if (0 != ret) {
                 return false;
@@ -54,7 +54,7 @@ namespace net {
             }
 
             epoll_event ev;
-            ev.data.ptr = s.get();
+            ev.data.fd = s->GetNativeSocket();
             auto ret = ::epoll_ctl(m_epollFd, EPOLL_CTL_DEL, s->GetNativeSocket(), &ev);
             if (0 != ret) {
                 return false;
@@ -82,7 +82,7 @@ namespace net {
 
             epoll_event ev;
             ev.events = events;
-            ev.data.ptr = s.get();
+            ev.data.fd = s->GetNativeSocket();
             return ::epoll_ctl(m_epollFd, EPOLL_CTL_MOD, s->GetNativeSocket(), &ev);
         });
 
@@ -113,7 +113,8 @@ namespace net {
 
         std::promise<void> started;
         auto future = started.get_future();
-        m_ioThread = std::thread(std::bind(&EpollLoop::ProcessLoop, this, std::ref(started)));
+        m_ioThread =
+            std::thread(std::bind(&EpollLoop::ProcessLoop, this, std::ref(started)));
         future.get();
 
         return true;
@@ -148,38 +149,53 @@ namespace net {
 
         epoll_event events[1024];
         while (!m_shutDown) {
-            auto nfds = ::epoll_wait(m_epollFd, events, sizeof(events) / sizeof(epoll_event), -1);
+            auto nfds =
+                ::epoll_wait(m_epollFd, events, sizeof(events) / sizeof(epoll_event), -1);
             if (-1 == nfds) {
                 if (errno == EINTR) {
                     continue;
                 } else {
-                    std::cout << "FATAL epoll_wait failed errno " << errno << ", " << ::strerror(errno) << std::endl;
+                    std::cout << "FATAL epoll_wait failed errno " << errno << ", "
+                              << ::strerror(errno) << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
             }
 
             for (int i = 0; i < nfds; i++) {
-                auto ptr = static_cast<AsyncSocket *>(events[i].data.ptr);
+                auto fd_iter = m_evSockets.find(events[i].data.fd);
+                if (fd_iter == m_evSockets.end()) {
+                    continue;
+                }
+
+                auto ptr = fd_iter->second.lock();
+                if (nullptr == ptr) {
+                    continue;
+                }
                 if (EPOLLIN & events[i].events) {
                     auto nread = ptr->HandleRead();
                     if (0 == nread) {
-                        RemoveAsyncSocket(m_evSockets[ptr->GetNativeSocket()].lock());
+                        RemoveAsyncSocket(ptr);
                     }
 
-                    if (-1 == nread && errno != EAGAIN && errno != ECONNABORTED && errno != EPROTO && errno != EINTR) {
+                    if (-1 == nread && errno != EAGAIN && errno != ECONNABORTED &&
+                        errno != EPROTO && errno != EINTR) {
                         if (errno == ECONNRESET) {
-                            RemoveAsyncSocket(m_evSockets[ptr->GetNativeSocket()].lock());
+                            RemoveAsyncSocket(ptr);
                         }
-                        std::cout << "EpollLoop::ProcessLoop HandleRead error, errno: " << errno << ", " << ::strerror(errno)
-                                  << " read bytes " << nread << std::endl;
+                        std::cout
+                            << "EpollLoop::ProcessLoop HandleRead error, errno: " << errno
+                            << ", " << ::strerror(errno) << " read bytes " << nread
+                            << std::endl;
                     }
                 }
 
                 if (EPOLLOUT & events[i].events) {
                     auto nwrite = ptr->HandleWrite();
-                    if (-1 == nwrite && errno != EAGAIN && errno != ECONNABORTED && errno != EPROTO && errno != EINTR) {
-                        std::cout << "EpollLoop::ProcessLoop HandleWrite error, errno: " << errno << ", " << ::strerror(errno)
-                                  << " write bytes " << nwrite << std::endl;
+                    if (-1 == nwrite && errno != EAGAIN && errno != ECONNABORTED &&
+                        errno != EPROTO && errno != EINTR) {
+                        std::cout << "EpollLoop::ProcessLoop HandleWrite error, errno: "
+                                  << errno << ", " << ::strerror(errno) << " write bytes "
+                                  << nwrite << std::endl;
                     }
                 }
             }

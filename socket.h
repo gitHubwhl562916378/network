@@ -1,7 +1,18 @@
+/**
+ * @file socket.h
+ * @brief 文件描述符基类，管理基本信息
+ * @details 对文件描述符，网络布套接字基本信息管理
+ * @author 王华林
+ * @date 2022-05-25
+ * @version 1.0
+ * @copyright  Copyright (c) of Ningbo Geely
+ * Automobile Research and Development Co., Ltd. 2022
+ *
+ */
 #pragma once
-
 #include <stdint.h>
 #include <unistd.h>
+#include <iostream>
 #include "iNetHost.h"
 #include "noncopyable.h"
 
@@ -14,7 +25,7 @@ namespace net {
         Socket(const int32_t fd)
             : m_nativeSocket(fd) {}
         virtual ~Socket() {
-            ::printf("Socket::~Socket()\n");
+            std::cout << "Socket::~Socket()" << std::endl;
         }
 
         int32_t GetNativeSocket() const {

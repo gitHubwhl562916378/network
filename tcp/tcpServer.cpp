@@ -13,7 +13,8 @@ namespace net {
         : m_loop(loop) {
         auto fd = ::socket(AF_INET, SOCK_STREAM, 0);
         int32_t option = 1;
-        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option,
+                     sizeof(option));
         int opts = ::fcntl(fd, F_GETFL);
         opts |= O_NONBLOCK;
         ::fcntl(fd, F_SETFL, opts);
@@ -56,9 +57,11 @@ namespace net {
     }
 
     void TcpServer::OnNewConnection(std::shared_ptr<AsyncTcpSocket> client) {
-        std::cout << "New connection: " << client->GetINetHost().Ip() << " " << client->GetINetHost().Port() << std::endl;
+        std::cout << "New connection: " << client->GetINetHost().Ip() << " "
+                  << client->GetINetHost().Port() << std::endl;
         client->Read([](std::shared_ptr<AsyncSocket> s, const std::string &data) {
-            std::cout << "Receive client " << s->GetINetHost().Ip() << " " << s->GetINetHost().Port() << " size: " << data.size() << " "
+            std::cout << "Receive client " << s->GetINetHost().Ip() << " "
+                      << s->GetINetHost().Port() << " size: " << data.size() << " "
                       << data.capacity() << " data: " << data << std::endl;
             s->Write("packed data");
         });
@@ -86,9 +89,16 @@ namespace net {
             }
 
             std::shared_ptr<AsyncTcpSocket> session;
-            session.reset(new AsyncTcpSocket(m_loop.lock(), conn_fd, INetHost{::inet_ntoa(remote.sin_addr), ::ntohs(remote.sin_port)}));
+            auto m_sloop = m_loop.lock();
+            if (nullptr == m_sloop) {
+                continue;
+            }
+
+            session.reset(new AsyncTcpSocket(
+                m_sloop, conn_fd,
+                INetHost{::inet_ntoa(remote.sin_addr), ::ntohs(remote.sin_port)}));
             OnNewConnection(session);
-            m_loop.lock()->AddAsyncSocket(session);
+            m_sloop->AddAsyncSocket(session);
             {
                 std::lock_guard<std::mutex> lock(m_sessionMtx);
                 m_sessions.insert({conn_fd, session});

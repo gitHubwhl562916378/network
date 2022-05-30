@@ -15,7 +15,8 @@ namespace net {
         SetNativeSocket(fd);
     }
 
-    AsyncTcpSocket::AsyncTcpSocket(std::shared_ptr<IoLoop> loop, const int32_t fd, const INetHost &host)
+    AsyncTcpSocket::AsyncTcpSocket(std::shared_ptr<IoLoop> loop, const int32_t fd,
+                                   const INetHost &host)
         : AsyncSocket(fd)
         , m_loop(loop) {
         int opts = ::fcntl(fd, F_GETFL);
@@ -47,7 +48,8 @@ namespace net {
             linger m;
             m.l_onoff = 1;  // close调用时，还有数据没发送完毕，允许逗留
             m.l_linger = 2; // time_wait时间,秒计算
-            setsockopt(GetNativeSocket(), SOL_SOCKET, SO_LINGER, (const char *)&m, sizeof(m));
+            setsockopt(GetNativeSocket(), SOL_SOCKET, SO_LINGER, (const char *)&m,
+                       sizeof(m));
             SetHost(host);
             m_isConected = true;
         }
@@ -60,10 +62,16 @@ namespace net {
             return;
         }
 
-        if (m_loop.lock()->IsInLoopTread()) {
+        auto m_sloop = m_loop.lock();
+        if (nullptr == m_sloop) {
+            return;
+        }
+
+        if (m_sloop->IsInLoopTread()) {
             size_t remaining = data.size();
             bool faultError = false;
-            int32_t nwrite = TcpSocket::Write(GetNativeSocket(), data.data(), data.size());
+            int32_t nwrite =
+                TcpSocket::Write(GetNativeSocket(), data.data(), data.size());
             if (nwrite >= 0) {
                 remaining = data.size() - nwrite;
                 if (0 == remaining) {
@@ -85,14 +93,14 @@ namespace net {
                     std::lock_guard<std::mutex> lock(m_dataMtx);
                     m_writeCache += std::string(data.data() + nwrite, remaining);
                 }
-                m_loop.lock()->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
+                m_sloop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
             }
         } else {
             {
                 std::lock_guard<std::mutex> lock(m_dataMtx);
                 m_writeCache += std::move(data);
             }
-            m_loop.lock()->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
+            m_sloop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
         }
     }
 
@@ -104,40 +112,44 @@ namespace net {
     int32_t AsyncTcpSocket::HandleWrite() {
         std::string writeTemp;
         int32_t nwrite;
-        {
-            do {
-                std::unique_lock<std::mutex> lock(m_dataMtx, std::try_to_lock);
-                if (!lock.owns_lock()) {
-                    continue;
-                }
-
-                bool faultError = false;
-                nwrite =
-                    TcpSocket::Write(GetNativeSocket(), m_writeCache.data() + m_writedCacheLen, m_writeCache.size() - m_writedCacheLen);
-                if (nwrite >= 0) {
-                    m_writedCacheLen += nwrite;
-                    if (m_writedCacheLen == m_writeCache.size()) {
-                        m_writedCacheLen = 0;
-                        m_writeCache.clear();
-                        m_loop.lock()->Update(EPOLLIN | EPOLLET, shared_from_this());
-                    }
-                } else // nwrote < 0
-                {
-                    nwrite = 0;
-                    if (errno != EWOULDBLOCK) {
-                        if (errno == EPIPE || errno == ECONNRESET) // FIXME: any others?
-                        {
-                            faultError = true;
-                        }
-                    }
-                }
-
-                if (!faultError && m_writedCacheLen != m_writeCache.size()) {
-                    m_loop.lock()->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
-                }
-                break;
-            } while (true);
+        auto m_sloop = m_loop.lock();
+        if (nullptr == m_sloop) {
+            return -1;
         }
+
+        do {
+            std::unique_lock<std::mutex> lock(m_dataMtx, std::try_to_lock);
+            if (!lock.owns_lock()) {
+                continue;
+            }
+
+            bool faultError = false;
+            nwrite = TcpSocket::Write(GetNativeSocket(),
+                                      m_writeCache.data() + m_writedCacheLen,
+                                      m_writeCache.size() - m_writedCacheLen);
+            if (nwrite >= 0) {
+                m_writedCacheLen += nwrite;
+                if (m_writedCacheLen == m_writeCache.size()) {
+                    m_writedCacheLen = 0;
+                    m_writeCache.clear();
+                    m_sloop->Update(EPOLLIN | EPOLLET, shared_from_this());
+                }
+            } else // nwrote < 0
+            {
+                nwrite = 0;
+                if (errno != EWOULDBLOCK) {
+                    if (errno == EPIPE || errno == ECONNRESET) // FIXME: any others?
+                    {
+                        faultError = true;
+                    }
+                }
+            }
+
+            if (!faultError && m_writedCacheLen != m_writeCache.size()) {
+                m_sloop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
+            }
+            break;
+        } while (true);
 
         return nwrite;
     }
@@ -147,7 +159,8 @@ namespace net {
         int32_t readSize = 0;
         while (true) {
             std::string buffer(4096, 0);
-            nread = TcpSocket::Read(GetNativeSocket(), const_cast<char *>(buffer.data()), buffer.size());
+            nread = TcpSocket::Read(GetNativeSocket(), const_cast<char *>(buffer.data()),
+                                    buffer.size());
             if (0 >= nread) {
                 break;
             }
