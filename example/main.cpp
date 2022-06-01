@@ -310,7 +310,7 @@ bool TestUdpServerBySyncClient(std::shared_ptr<geely::net::IoLoop> loop)
 
 bool TestTimerOneTime(std::shared_ptr<geely::net::IoLoop> loop, const uint32_t firstInterval, const uint32_t intervalAfterFirst)
 {
-    auto timer = std::make_shared<geely::TimerSocket>(firstInterval, intervalAfterFirst);
+    auto timer = std::make_shared<geely::TimerSocket>(loop, firstInterval, intervalAfterFirst);
     timer->OnTimeOut([](const uint64_t t)
                      { std::cout << "TestTimerOneTime timeout " << t << std::endl; });
     loop->AddAsyncSocket(timer);
@@ -321,7 +321,6 @@ bool TestTimerOneTime(std::shared_ptr<geely::net::IoLoop> loop, const uint32_t f
     }
 
     ::sleep(10);
-    loop->RemoveAsyncSocket(timer);
     return true;
 }
 
