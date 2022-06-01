@@ -19,9 +19,11 @@
 
 namespace geely {
 namespace net {
-    class AsyncTcpSocket : public AsyncSocket, public std::enable_shared_from_this<AsyncTcpSocket> {
+    class AsyncTcpSocket : public AsyncSocket,
+                           public std::enable_shared_from_this<AsyncTcpSocket> {
     public:
-        using READ_EVENT_CB = std::function<void(std::shared_ptr<AsyncSocket>, const std::string &)>;
+        using READ_EVENT_CB =
+            std::function<void(std::shared_ptr<AsyncSocket>, const std::string &)>;
         /**
          * @brief 生成套接字，构建对象
          *
@@ -60,7 +62,8 @@ namespace net {
          * @param loop 事件循环对象，保存
          * @param fd 文件描述符
          */
-        AsyncTcpSocket(std::shared_ptr<IoLoop> loop, const int32_t fd, const INetHost &host);
+        AsyncTcpSocket(std::shared_ptr<IoLoop> loop, const int32_t fd,
+                       const INetHost &host);
         /**
          * @brief 处理写回调，将缓存数据发送，发送完后，使用IoLoop::Update监听读事件
          *
@@ -73,7 +76,7 @@ namespace net {
         int32_t HandleRead() override;
 
         friend class TcpServer;
-        std::weak_ptr<IoLoop> m_loop;
+        std::shared_ptr<IoLoop> m_loop;
         std::mutex m_dataMtx;
         std::string m_writeCache;
         uint64_t m_writedCacheLen = 0;

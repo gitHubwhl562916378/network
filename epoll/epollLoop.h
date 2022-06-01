@@ -45,6 +45,13 @@ namespace net {
          */
         bool RemoveAsyncSocket(std::shared_ptr<AsyncSocket> s) override;
         /**
+         * @brief 删除要监听的套接字
+         * @param fd 要监听的文件描述符
+         * @return true 成功
+         * @return false 失败
+         */
+        bool RemoveAsyncSocket(const int32_t fd) override;
+        /**
          * @brief 修改监听事件
          * @param events 要监听的事件
          * @param s 要监听的套接字对象

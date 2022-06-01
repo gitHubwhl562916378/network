@@ -31,6 +31,7 @@ namespace net {
     }
 
     AsyncTcpSocket::~AsyncTcpSocket() {
+        m_loop->RemoveAsyncSocket(GetNativeSocket());
         Close();
     }
 
@@ -62,12 +63,7 @@ namespace net {
             return;
         }
 
-        auto m_sloop = m_loop.lock();
-        if (nullptr == m_sloop) {
-            return;
-        }
-
-        if (m_sloop->IsInLoopTread()) {
+        if (m_loop->IsInLoopTread()) {
             size_t remaining = data.size();
             bool faultError = false;
             int32_t nwrite =
@@ -93,14 +89,14 @@ namespace net {
                     std::lock_guard<std::mutex> lock(m_dataMtx);
                     m_writeCache += std::string(data.data() + nwrite, remaining);
                 }
-                m_sloop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
+                m_loop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
             }
         } else {
             {
                 std::lock_guard<std::mutex> lock(m_dataMtx);
                 m_writeCache += std::move(data);
             }
-            m_sloop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
+            m_loop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
         }
     }
 
@@ -112,10 +108,6 @@ namespace net {
     int32_t AsyncTcpSocket::HandleWrite() {
         std::string writeTemp;
         int32_t nwrite;
-        auto m_sloop = m_loop.lock();
-        if (nullptr == m_sloop) {
-            return -1;
-        }
 
         do {
             std::unique_lock<std::mutex> lock(m_dataMtx, std::try_to_lock);
@@ -132,7 +124,7 @@ namespace net {
                 if (m_writedCacheLen == m_writeCache.size()) {
                     m_writedCacheLen = 0;
                     m_writeCache.clear();
-                    m_sloop->Update(EPOLLIN | EPOLLET, shared_from_this());
+                    m_loop->Update(EPOLLIN | EPOLLET, shared_from_this());
                 }
             } else // nwrote < 0
             {
@@ -146,7 +138,7 @@ namespace net {
             }
 
             if (!faultError && m_writedCacheLen != m_writeCache.size()) {
-                m_sloop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
+                m_loop->Update(EPOLLIN | EPOLLOUT | EPOLLET, shared_from_this());
             }
             break;
         } while (true);

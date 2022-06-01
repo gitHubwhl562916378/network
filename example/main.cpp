@@ -74,8 +74,6 @@ int64_t TestTcpBigFile(std::shared_ptr<geely::net::IoLoop> loop, const int64_t f
     client->Write(file);
 
     sleep(5);
-    loop->RemoveAsyncSocket(client);
-    loop->RemoveAsyncSocket(server);
     auto ret = g_fileSize;
     return ret;
 }
@@ -129,8 +127,6 @@ bool TestCustomTcpServer(std::shared_ptr<geely::net::IoLoop> loop)
     }
 
     sleep(2);
-    loop->RemoveAsyncSocket(client);
-    loop->RemoveAsyncSocket(server);
     return true;
 }
 
@@ -163,11 +159,6 @@ bool TestTcpServerByMultiAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
     }
 
     sleep(5);
-    for (auto c : clients)
-    {
-        loop->RemoveAsyncSocket(c);
-    }
-    loop->RemoveAsyncSocket(server);
     return true;
 }
 
@@ -198,7 +189,6 @@ bool TestTcpServerByMultiSyncClient(std::shared_ptr<geely::net::IoLoop> loop)
     }
 
     sleep(5);
-    loop->RemoveAsyncSocket(server);
     return true;
 }
 
@@ -247,7 +237,6 @@ bool TestAsyncUdpClientWriteInCallBack(std::shared_ptr<geely::net::IoLoop> loop)
 
     //异步读写，等待，确保client读完后再释放。
     sleep(2);
-    loop->RemoveAsyncSocket(server);
     return true;
 }
 
@@ -285,7 +274,6 @@ bool TestUdpServerByAsyncClient(std::shared_ptr<geely::net::IoLoop> loop)
 
     //异步读写，等待，确保client读完后再释放。
     sleep(2);
-    loop->RemoveAsyncSocket(server);
     return true;
 }
 
@@ -317,7 +305,6 @@ bool TestUdpServerBySyncClient(std::shared_ptr<geely::net::IoLoop> loop)
             break;
         }
     }
-    loop->RemoveAsyncSocket(server);
     return true;
 }
 
@@ -346,15 +333,15 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    // TestAsyncUdpClientWriteInCallBack(loop);
-    // TestUdpServerByAsyncClient(loop);
-    // TestUdpServerBySyncClient(loop);
+    TestAsyncUdpClientWriteInCallBack(loop);
+    TestUdpServerByAsyncClient(loop);
+    TestUdpServerBySyncClient(loop);
 
-    // TestTcpBigFile(loop, 1024 * 1024 * 1024);
-    // TestTcpServerByMultiAsyncClient(loop);
-    // TestTcpServerByMultiSyncClient(loop);
+    TestTcpBigFile(loop, 1024 * 1024 * 1024);
+    TestTcpServerByMultiAsyncClient(loop);
+    TestTcpServerByMultiSyncClient(loop);
     TestCustomTcpServer(loop);
-    // TestTimerOneTime(loop, 500, 500);
+    TestTimerOneTime(loop, 500, 500);
 
     ::sleep(5);
     return 0;

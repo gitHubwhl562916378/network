@@ -26,6 +26,7 @@ namespace net {
     }
 
     TcpServer::~TcpServer() {
+        m_loop->RemoveAsyncSocket(GetNativeSocket());
         Close();
     }
 
@@ -89,16 +90,11 @@ namespace net {
             }
 
             std::shared_ptr<AsyncTcpSocket> session;
-            auto m_sloop = m_loop.lock();
-            if (nullptr == m_sloop) {
-                continue;
-            }
-
             session.reset(new AsyncTcpSocket(
-                m_sloop, conn_fd,
+                m_loop, conn_fd,
                 INetHost{::inet_ntoa(remote.sin_addr), ::ntohs(remote.sin_port)}));
             OnNewConnection(session);
-            m_sloop->AddAsyncSocket(session);
+            m_loop->AddAsyncSocket(session);
             {
                 std::lock_guard<std::mutex> lock(m_sessionMtx);
                 m_sessions.insert({conn_fd, session});

@@ -25,7 +25,8 @@ namespace net {
          */
         explicit TcpServer(std::shared_ptr<IoLoop> loop);
         /**
-         * @brief 回收资源, 对m_sessions中已有的连接不做RemoveAsyncSocket，认为析构程序退出。运行期间，由客户端断开在
+         * @brief 回收资源,
+         * 对m_sessions中已有的连接不做RemoveAsyncSocket，认为析构程序退出。运行期间，由客户端断开在
          * 事件循环中自动RemoveAsyncSocket
          * @retval
          */
@@ -38,7 +39,8 @@ namespace net {
          */
         bool Bind(const INetHost &host);
         /**
-         * @brief 绑定端口，监听端口，需要使用IoLoop::AddAsyncSocket添加到循环，并IoLoop::Update读事件
+         * @brief
+         * 绑定端口，监听端口，需要使用IoLoop::AddAsyncSocket添加到循环，并IoLoop::Update读事件
          *
          * @param num 最大监听的套接字数量
          * @return int32_t 返回码
@@ -82,7 +84,7 @@ namespace net {
          */
         int32_t HandleRead() override;
 
-        std::weak_ptr<IoLoop> m_loop;
+        std::shared_ptr<IoLoop> m_loop;
         std::mutex m_sessionMtx;
         std::map<int32_t, std::shared_ptr<AsyncTcpSocket>> m_sessions;
     };

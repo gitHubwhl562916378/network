@@ -36,6 +36,13 @@ namespace net {
          */
         virtual bool RemoveAsyncSocket(std::shared_ptr<AsyncSocket> s) = 0;
         /**
+         * @brief 在事件循环中删除事件
+         * @param fd 要删除事件的文件描述符
+         * @return true 成功
+         * @return false 失败
+         */
+        virtual bool RemoveAsyncSocket(const int32_t fd) = 0;
+        /**
          * @brief 修改要监听的下一个事件
          *
          * @param events 要监听的下一个事件类型

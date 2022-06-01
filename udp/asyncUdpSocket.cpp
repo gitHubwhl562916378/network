@@ -19,14 +19,17 @@ namespace net {
         SetHost(host);
     }
     AsyncUdpSocket::~AsyncUdpSocket() {
+        m_loop->RemoveAsyncSocket(GetNativeSocket());
         Close();
     }
     void AsyncUdpSocket::Write(const std::string &data) {
-        int32_t nwrite = UdpSocket::Write(GetNativeSocket(), data.data(), data.size(), GetINetHost());
+        int32_t nwrite =
+            UdpSocket::Write(GetNativeSocket(), data.data(), data.size(), GetINetHost());
         // UDP发送失败返回-1，成功返回整个报文大小，没有中间值;没送发送缓冲区
         if (-1 == nwrite) {
-            std::cout << "EpollLoop::ProcessLoop HandleWrite error, errno: " << errno << ", " << ::strerror(errno) << " write bytes "
-                      << nwrite << std::endl;
+            std::cout << "EpollLoop::ProcessLoop HandleWrite error, errno: " << errno
+                      << ", " << ::strerror(errno) << " write bytes " << nwrite
+                      << std::endl;
         }
     }
     void AsyncUdpSocket::Read(READ_EVENT_CB cb) {
@@ -36,7 +39,8 @@ namespace net {
     int32_t AsyncUdpSocket::HandleRead() {
         std::string buffer(1500, 0);
         INetHost remote;
-        auto bytes = UdpSocket::Read(GetNativeSocket(), const_cast<char *>(buffer.data()), buffer.size(), remote);
+        auto bytes = UdpSocket::Read(GetNativeSocket(), const_cast<char *>(buffer.data()),
+                                     buffer.size(), remote);
         if (0 >= bytes) {
             return bytes;
         }

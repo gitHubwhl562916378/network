@@ -73,6 +73,33 @@ namespace net {
         return task->get_future().get();
     }
 
+    bool EpollLoop::RemoveAsyncSocket(const int32_t fd) {
+        auto task = std::make_shared<std::packaged_task<int32_t()>>([&] {
+            auto iter = m_evSockets.find(fd);
+            if (iter == m_evSockets.end()) {
+                return true;
+            }
+
+            epoll_event ev;
+            ev.data.fd = fd;
+            auto ret = ::epoll_ctl(m_epollFd, EPOLL_CTL_DEL, fd, &ev);
+            if (0 != ret) {
+                return false;
+            }
+
+            m_evSockets.erase(iter);
+            return true;
+        });
+
+        if (IsInLoopTread()) {
+            (*task)();
+        } else {
+            RunInLoop(task);
+        }
+
+        return task->get_future().get();
+    }
+
     int32_t EpollLoop::Update(const int32_t events, std::shared_ptr<AsyncSocket> s) {
         auto task = std::make_shared<std::packaged_task<int32_t()>>([&] {
             auto iter = m_evSockets.find(s->GetNativeSocket());

@@ -13,12 +13,11 @@ namespace net {
     UdpServer::UdpServer(std::shared_ptr<IoLoop> loop)
         : AsyncUdpSocket(loop, INetHost()) {
         int32_t option = 1;
-        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option,
+                     sizeof(option));
     }
 
-    UdpServer::~UdpServer() {
-        Close();
-    }
+    UdpServer::~UdpServer() {}
 
     bool UdpServer::Bind(const INetHost &host) {
         sockaddr_in ser_addr;
@@ -26,7 +25,8 @@ namespace net {
         ser_addr.sin_family = AF_INET;
         ser_addr.sin_port = ::htons(host.Port());
         ser_addr.sin_addr.s_addr = ::inet_addr(host.Ip().data());
-        Read(std::bind(&UdpServer::OnClientMessage, this, std::placeholders::_1, std::placeholders::_2));
+        Read(std::bind(&UdpServer::OnClientMessage, this, std::placeholders::_1,
+                       std::placeholders::_2));
         SetHost(host);
         m_localHost = host;
 
@@ -37,9 +37,11 @@ namespace net {
         return m_localHost;
     }
 
-    void UdpServer::OnClientMessage(std::shared_ptr<AsyncSocket> session, const std::string &data) {
+    void UdpServer::OnClientMessage(std::shared_ptr<AsyncSocket> session,
+                                    const std::string &data) {
         auto remote = GetINetHost();
-        std::cout << "receive client message Ip: " << remote.Ip() << " Port: " << remote.Port() << " Bytes: " << data.size() << std::endl;
+        std::cout << "receive client message Ip: " << remote.Ip()
+                  << " Port: " << remote.Port() << " Bytes: " << data.size() << std::endl;
         std::cout << data << std::endl;
 
         session->Write("I Recevied " + std::to_string(data.size()) + " bytes");
