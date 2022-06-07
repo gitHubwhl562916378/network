@@ -19,6 +19,7 @@ namespace geely
     TimerSocket::~TimerSocket()
     {
         m_loop->RemoveAsyncSocket(GetNativeSocket());
+        Close();
     }
 
     void TimerSocket::SetFirstInterval(const uint32_t interval)
