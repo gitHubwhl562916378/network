@@ -19,7 +19,6 @@ namespace geely
     TimerSocket::~TimerSocket()
     {
         m_loop->RemoveAsyncSocket(GetNativeSocket());
-        Close();
     }
 
     void TimerSocket::SetFirstInterval(const uint32_t interval)
@@ -36,10 +35,9 @@ namespace geely
     {
         itimerspec fut;
         fut.it_value.tv_sec = m_firstInterval.load() / 1000;
-        fut.it_value.tv_nsec = (m_firstInterval.load() - fut.it_value.tv_sec * 1000) * 1e6;
+        fut.it_value.tv_nsec = static_cast<__syscall_slong_t>((m_firstInterval.load() - fut.it_value.tv_sec * 1000) * 1e6l);
         fut.it_interval.tv_sec = m_intervalAfterFirst.load() / 1000;
-        fut.it_interval.tv_nsec =
-            (m_intervalAfterFirst.load() - fut.it_interval.tv_sec * 1000) * 1e6;
+        fut.it_interval.tv_nsec = static_cast<__syscall_slong_t>((m_intervalAfterFirst.load() - fut.it_interval.tv_sec * 1000) * 1e6l);
 
         return -1 != ::timerfd_settime(GetNativeSocket(), 0, &fut, nullptr);
     }

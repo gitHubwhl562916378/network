@@ -14,54 +14,57 @@
 #include "noncopyable.h"
 #include "asyncSocket.h"
 
-namespace geely {
-namespace net {
-    class IoLoop : noncopyable {
-    public:
-        virtual ~IoLoop() {}
-        /**
+namespace geely
+{
+    namespace net
+    {
+        class LIB_EXPORT IoLoop : noncopyable
+        {
+        public:
+            virtual ~IoLoop() {}
+            /**
          * @brief 添加到事件监听循环中
          *
          * @param s 套接字共享指针
          * @return true 添加成功
          * @return false 添加失败
          */
-        virtual bool AddAsyncSocket(std::shared_ptr<AsyncSocket> s) = 0;
-        /**
+            virtual bool AddAsyncSocket(std::shared_ptr<AsyncSocket> s) = 0;
+            /**
          * @brief 在事件循环中删除事件
          *
          * @param s 要删除事件的共享指针
          * @return true 删除成功
          * @return false 删除失败
          */
-        virtual bool RemoveAsyncSocket(std::shared_ptr<AsyncSocket> s) = 0;
-        /**
+            virtual bool RemoveAsyncSocket(std::shared_ptr<AsyncSocket> s) = 0;
+            /**
          * @brief 在事件循环中删除事件
          * @param fd 要删除事件的文件描述符
          * @return true 成功
          * @return false 失败
          */
-        virtual bool RemoveAsyncSocket(const int32_t fd) = 0;
-        /**
+            virtual bool RemoveAsyncSocket(const int32_t fd) = 0;
+            /**
          * @brief 修改要监听的下一个事件
          *
          * @param events 要监听的下一个事件类型
          * @param s 事件对象指针
          * @return int32_t 成功为0，不成功为错误码
          */
-        virtual int32_t Update(const int32_t events, std::shared_ptr<AsyncSocket> s) = 0;
-        /**
+            virtual int32_t Update(const int32_t events, std::shared_ptr<AsyncSocket> s) = 0;
+            /**
          * @brief 启动IO事件循环,非阻塞
          * @return true 成功
          * @return false 失败
          */
-        virtual bool Run() = 0;
-        /**
+            virtual bool Run() = 0;
+            /**
          * @brief 判断是否在Io线程
          * @return true 在
          * @return false 不在
          */
-        virtual bool IsInLoopTread() = 0;
-    };
-} // namespace net
+            virtual bool IsInLoopTread() = 0;
+        };
+    } // namespace net
 } // namespace geely

@@ -1,6 +1,10 @@
-#include <fcntl.h>
+#ifdef _WIN32
+#include "../iocp/iocpLoop.h"
+#else
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#endif // _WIN32
+#include <fcntl.h>
 #include <string.h>
 #include <iterator>
 #include <iostream>
@@ -13,8 +17,11 @@ namespace net {
     UdpServer::UdpServer(std::shared_ptr<IoLoop> loop)
         : AsyncUdpSocket(loop, INetHost()) {
         int32_t option = 1;
-        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option,
-                     sizeof(option));
+#ifdef _WIN32
+        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&option), sizeof(option));
+#else
+        ::setsockopt(GetNativeSocket(), SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+#endif // _WIN32
     }
 
     UdpServer::~UdpServer() {}
@@ -30,7 +37,15 @@ namespace net {
         SetHost(host);
         m_localHost = host;
 
-        return !::bind(GetNativeSocket(), (sockaddr *)&ser_addr, sizeof(ser_addr));
+        bool ret = !::bind(GetNativeSocket(), (sockaddr*)&ser_addr, sizeof(ser_addr));
+#ifdef _WIN32
+        if (false == ret) {
+            return ret;
+        }
+
+        HandleRead(nullptr, 0);
+#endif
+        return ret;
     }
 
     INetHost UdpServer::GetLocalHost() const {
