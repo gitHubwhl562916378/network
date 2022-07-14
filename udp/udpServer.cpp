@@ -43,6 +43,7 @@ namespace net {
             return ret;
         }
 
+        m_isFirstSend = false;
         HandleRead(nullptr, 0);
 #endif
         return ret;
